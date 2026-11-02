@@ -7,6 +7,7 @@ Prosty minutnik siedzący w zasobniku systemowym (tray) Windows.
 - Presety: 5, 10, 15, 25, 45 min + własny czas
 - Menu PPM: Start / Pauza / Reset / Ustaw czas / Wyjdź
 - Tooltip z pozostałym czasem (MM:SS)
+- **Budzik** na konkretną godzinę: PPM → „Ustaw budzik...” → wpisz `HH:MM` (np. `07:30`). Jeśli godzina już minęła, budzik ustawi się na jutro. Anulujesz przez „Anuluj budzik”. Tooltip pokazuje godzinę budzika i ile zostało.
 - Po zakończeniu: powiadomienie Windows + sygnał dźwiękowy, tooltip „Koniec!”
 
 ## Uruchomienie (Windows)

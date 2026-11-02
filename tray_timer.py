@@ -1,6 +1,7 @@
 """Tray Timer - prosty minutnik w zasobniku systemowym Windows."""
 import threading
 import time
+from datetime import datetime, timedelta
 import tkinter as tk
 from tkinter import simpledialog
 
@@ -21,6 +22,7 @@ class TrayTimer:
         self.remaining = self.total
         self.running = False
         self.lock = threading.Lock()
+        self.alarm = None  # datetime budzika
         self.icon = pystray.Icon("tray_timer", self.make_icon(), self.title(), self.build_menu())
         threading.Thread(target=self.tick, daemon=True).start()
 
@@ -40,7 +42,12 @@ class TrayTimer:
 
     def title(self):
         state = "" if self.running else " (pauza)"
-        return f"Minutnik: {self.fmt()}{state}"
+        t = f"Minutnik: {self.fmt()}{state}"
+        if self.alarm:
+            left = int((self.alarm - datetime.now()).total_seconds())
+            h, r = divmod(max(left, 0), 3600)
+            t += f"\nBudzik: {self.alarm:%H:%M} (za {h}h {r // 60:02d}m)"
+        return t
 
     def refresh(self, done=False):
         self.icon.icon = self.make_icon(done)
@@ -51,6 +58,10 @@ class TrayTimer:
     def tick(self):
         while True:
             time.sleep(1)
+            if self.alarm and datetime.now() >= self.alarm:
+                self.alarm = None
+                self.finish("Budzik!", "Budzik")
+                continue
             with self.lock:
                 if not self.running:
                     continue
@@ -61,13 +72,13 @@ class TrayTimer:
                     self.running = False
             if finished:
                 self.finish()
-            else:
+            elif self.running or self.alarm:
                 self.refresh()
 
-    def finish(self):
+    def finish(self, msg="Czas minął!", title="Minutnik"):
         self.refresh(done=True)
         try:
-            self.icon.notify("Czas minął!", "Minutnik")
+            self.icon.notify(msg, title)
         except Exception:
             pass
         if winsound:
@@ -110,6 +121,34 @@ class TrayTimer:
                 self.set_minutes(val)
         threading.Thread(target=ask, daemon=True).start()
 
+    def set_alarm(self, *_):
+        def ask():
+            root = tk.Tk()
+            root.withdraw()
+            root.attributes("-topmost", True)
+            default = self.alarm.strftime("%H:%M") if self.alarm else "07:00"
+            val = simpledialog.askstring("Budzik", "Godzina (HH:MM):", initialvalue=default, parent=root)
+            root.destroy()
+            if not val:
+                return
+            try:
+                h, m = map(int, val.strip().replace(".", ":").split(":"))
+                now = datetime.now()
+                target = now.replace(hour=h, minute=m, second=0, microsecond=0)
+            except ValueError:
+                self.icon.notify("Zły format, użyj HH:MM", "Budzik")
+                return
+            if target <= now:
+                target += timedelta(days=1)
+            self.alarm = target
+            self.refresh()
+            self.icon.notify(f"Budzik ustawiony na {target:%H:%M}", "Budzik")
+        threading.Thread(target=ask, daemon=True).start()
+
+    def cancel_alarm(self, *_):
+        self.alarm = None
+        self.refresh()
+
     def quit(self, *_):
         self.icon.stop()
 
@@ -123,6 +162,10 @@ class TrayTimer:
             Item("Pauza", self.pause, enabled=lambda _: self.running),
             Item("Reset", self.reset),
             Item("Ustaw czas", pystray.Menu(*presets, pystray.Menu.SEPARATOR, Item("Własny...", self.custom))),
+            pystray.Menu.SEPARATOR,
+            Item(lambda _: f"Budzik: {self.alarm:%H:%M}" if self.alarm else "Budzik: wyłączony", None, enabled=False),
+            Item("Ustaw budzik...", self.set_alarm),
+            Item("Anuluj budzik", self.cancel_alarm, enabled=lambda _: self.alarm is not None),
             pystray.Menu.SEPARATOR,
             Item("Wyjdź", self.quit),
         )
