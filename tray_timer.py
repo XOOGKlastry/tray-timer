@@ -81,10 +81,31 @@ class TrayTimer:
             self.icon.notify(msg, title)
         except Exception:
             pass
+        self._play_ready()
+
+    def _play_ready(self):
+        """Przyjazny dźwięk: głos „Ready!” (Windows SAPI), inaczej miękka melodia."""
+        import subprocess
+        import sys
+        if sys.platform == "win32":
+            try:
+                subprocess.run(
+                    [
+                        "powershell",
+                        "-NoProfile",
+                        "-Command",
+                        "(New-Object -ComObject SAPI.SpVoice).Speak('Ready!')",
+                    ],
+                    check=False,
+                    creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+                )
+                return
+            except Exception:
+                pass
         if winsound:
-            for _ in range(3):
-                winsound.Beep(1000, 300)
-                time.sleep(0.15)
+            for freq, dur in ((523, 120), (659, 120), (784, 180), (1046, 280)):
+                winsound.Beep(freq, dur)
+                time.sleep(0.04)
 
     def set_minutes(self, minutes):
         with self.lock:
